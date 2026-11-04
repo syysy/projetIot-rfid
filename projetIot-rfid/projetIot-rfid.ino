@@ -23,7 +23,7 @@ const int   daylightOffset_sec = 3600; // Heure d'été
 
 AsyncWebServer server(80);
 
-// ---------- Écran OLED (I2C) ----------
+//---------- Écran ----------
 #define SDA_PIN 9   
 #define SCL_PIN 10  
 #define SCREEN_WIDTH  128
@@ -33,7 +33,7 @@ AsyncWebServer server(80);
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// ---------- Lecteur RFID RC522 (SPI) ----------
+//---------- Lecteur RFID ----------
 #define SCK_PIN   2
 #define MISO_PIN  6
 #define MOSI_PIN  7
@@ -42,10 +42,11 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 MFRC522 rfid(SS_PIN, RST_PIN);
 
-// ---------- LED Multicolore ----------
+//---------- LED ----------
 #define LED_ROUGE_PIN 4
 #define LED_VERT_PIN  5
 
+<<<<<<< HEAD
 // ---------- Structure des Badges (UID + Nom du porteur) ----------
 struct BadgeInfo {
   byte uid[4];
@@ -59,6 +60,14 @@ BadgeInfo badgesAutorises[MAX_BADGES] = {
 int nbBadgesAutorises = 1;
 
 // Gestion du temps (10 secondes d'ajout de badges au démarrage)
+=======
+//---------- UID autorisés ----------
+#define MAX_BADGES 10
+byte badgesAutorises[MAX_BADGES][4] = {};
+int nbBadgesAutorises = 0;
+
+// 10 secondes d'enregistrement au démarrage
+>>>>>>> 88d39cdbec9b115694df3ac03a00dd1b54729441
 unsigned long debutProgramme = 0;
 const unsigned long DUREE_MODE_AJOUT = 10000;
 bool messageAttenteAffiche = false;
@@ -189,9 +198,15 @@ String obtenirDateHeure() {
   return String(buffer);
 }
 
+<<<<<<< HEAD
 // Cherche l'indice du badge dans le tableau (-1 si inconnu)
 int chercherIndiceBadge(byte *uid, byte tailleUid) {
   if (tailleUid != 4) return -1;
+=======
+// Vérifie si l'UID est autorisé
+bool estBadgeAutorise(byte *uid, byte tailleUid) {
+  if (tailleUid != 4) return false;
+>>>>>>> 88d39cdbec9b115694df3ac03a00dd1b54729441
   for (int i = 0; i < nbBadgesAutorises; i++) {
     bool correspond = true;
     for (byte j = 0; j < 4; j++) {
@@ -205,6 +220,7 @@ int chercherIndiceBadge(byte *uid, byte tailleUid) {
   return -1;
 }
 
+<<<<<<< HEAD
 // ---------- Envoi automatique vers Firebase ----------
 void envoyerVersFirebase(String uidStr, String nomPorteur, String statutAcces) {
   if (WiFi.status() != WL_CONNECTED) {
@@ -244,21 +260,38 @@ void envoyerVersFirebase(String uidStr, String nomPorteur, String statutAcces) {
 }
 
 // ---------- Enregistrement d'un badge (10 premières secondes) ----------
+=======
+//---------- Enregistrement de badge dans la liste pendant les 10 premières secondes ----------
+>>>>>>> 88d39cdbec9b115694df3ac03a00dd1b54729441
 void writeDataToRFIDTag() {
   if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
     return;
   }
 
+<<<<<<< HEAD
   int indice = chercherIndiceBadge(rfid.uid.uidByte, rfid.uid.size);
 
   if (indice != -1) {
     afficherMessage("Deja enregistre", badgesAutorises[indice].nom.c_str());
     digitalWrite(LED_VERT_PIN, HIGH);
   } 
+=======
+  // Vérifier si le badge est déjà enregistré
+  if (estBadgeAutorise(rfid.uid.uidByte, rfid.uid.size)) {
+    Serial.println(F("Ce badge est déjà dans la liste !"));
+    afficherMessage("Deja enregistre", "Badge connu");
+    digitalWrite(LED_VERT_PIN, HIGH);
+  } 
+  // Vérifier s'il reste de la place dans le tableau
+>>>>>>> 88d39cdbec9b115694df3ac03a00dd1b54729441
   else if (nbBadgesAutorises >= MAX_BADGES) {
     afficherMessage("Erreur Memoire", "Liste pleine !");
     digitalWrite(LED_ROUGE_PIN, HIGH);
   } 
+<<<<<<< HEAD
+=======
+  // Ajouter l'UID du nouveau badge dans le tableau
+>>>>>>> 88d39cdbec9b115694df3ac03a00dd1b54729441
   else {
     for (byte i = 0; i < 4; i++) {
       badgesAutorises[nbBadgesAutorises].uid[i] = rfid.uid.uidByte[i];
@@ -278,7 +311,11 @@ void writeDataToRFIDTag() {
   rfid.PCD_StopCrypto1();
 }
 
+<<<<<<< HEAD
 // ---------- Lecture, Vérification et Envoi Firebase (après 10 secondes) ----------
+=======
+//---------- Lecture et vérification d'accès après les ajouts ----------
+>>>>>>> 88d39cdbec9b115694df3ac03a00dd1b54729441
 void readingDataFromRFIDTag() {
   if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
     return;
@@ -324,6 +361,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
+  // setup LED
   pinMode(LED_ROUGE_PIN, OUTPUT);
   pinMode(LED_VERT_PIN, OUTPUT);
   digitalWrite(LED_ROUGE_PIN, LOW);
@@ -369,13 +407,23 @@ void setup() {
 void loop() {
   unsigned long tempsEcoule = millis() - debutProgramme;
 
+<<<<<<< HEAD
+=======
+  // 10 premières secondes enregistrement dans le tableau
+>>>>>>> 88d39cdbec9b115694df3ac03a00dd1b54729441
   if (tempsEcoule < DUREE_MODE_AJOUT) {
     int secondesRestantes = (DUREE_MODE_AJOUT - tempsEcoule) / 1000 + 1;
     char buffer[25];
     snprintf(buffer, sizeof(buffer), "Scannez (%d s)", secondesRestantes);
     afficherMessage("Ajout de badge :", buffer);
     writeDataToRFIDTag();
+<<<<<<< HEAD
   } else {
+=======
+  } 
+  // contrôle d'accès
+  else {
+>>>>>>> 88d39cdbec9b115694df3ac03a00dd1b54729441
     if (!messageAttenteAffiche) {
       String ipStr = "IP: " + WiFi.localIP().toString();
       afficherMessage("En attente...", ipStr.c_str());
