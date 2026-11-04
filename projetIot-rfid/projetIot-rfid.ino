@@ -120,7 +120,7 @@ void writeDataToRFIDTag() {
   rfid.PCD_StopCrypto1();
 }
 
-// ---------- Lecture et vérification d'accès après les ajouts ----------
+//---------- Lecture et vérification d'accès après les ajouts ----------
 void readingDataFromRFIDTag() {
   if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
     return;
@@ -152,6 +152,7 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
 
+  // setup LED
   pinMode(LED_ROUGE_PIN, OUTPUT);
   pinMode(LED_VERT_PIN, OUTPUT);
   digitalWrite(LED_ROUGE_PIN, LOW);
