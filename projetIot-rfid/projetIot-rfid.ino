@@ -22,31 +22,28 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 #define RST_PIN   8
 
 MFRC522 rfid(SS_PIN, RST_PIN);
-MFRC522::MIFARE_Key key;
 
 // ---------- LED Multicolore ----------
 #define LED_ROUGE_PIN 4
 #define LED_VERT_PIN  5
 
-// ---------- Liste des UID autorisés (4 octets) ----------
-// Remplacez ces valeurs par l'UID réel de votre badge (visible dans le moniteur série)
-const byte badgesAutorises[][4] = {
-  {0xDE, 0xAD, 0xBE, 0xEF}, // Badge 1
-  {0x12, 0x34, 0x56, 0x78}  // Badge 2
+// ---------- Liste dynamique des UID autorisés ----------
+#define MAX_BADGES 10
+byte badgesAutorises[MAX_BADGES][4] = {
+  {0xDE, 0xAD, 0xBE, 0xEF} // 1er badge par défaut (optionnel)
 };
-const int nbBadgesAutorises = sizeof(badgesAutorises) / sizeof(badgesAutorises[0]);
+int nbBadgesAutorises = 1; // Nombre actuel de badges dans la liste
 
-// Variables de gestion du temps (10 secondes d'écriture au lancement)
+// Gestion du temps (10 secondes d'enregistrement au démarrage)
 unsigned long debutProgramme = 0;
-const unsigned long DUREE_MODE_ECRITURE = 10000; // 10 000 ms = 10 s
+const unsigned long DUREE_MODE_AJOUT = 10000; // 10 secondes
 bool messageAttenteAffiche = false;
 
-// Fonction utilitaire pour afficher facilement sur l'OLED
 void afficherMessage(const char* ligne1, const char* ligne2 = "") {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 10);
+  display.setCursor(0, 0);
   display.println(ligne1);
   if (strlen(ligne2) > 0) {
     display.setCursor(0, 30);
@@ -68,14 +65,9 @@ void setupRFID() {
   SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, SS_PIN);
   rfid.PCD_Init();
   delay(10);
-  
-  // Préparation de la clé par défaut MIFARE (0xFF partout) pour l'écriture
-  for (byte i = 0; i < 6; i++) {
-    key.keyByte[i] = 0xFF;
-  }
 }
 
-// Vérifie si l'UID scanné fait partie de la liste autorisée
+// Vérifie si l'UID est déjà présent dans le tableau
 bool estBadgeAutorise(byte *uid, byte tailleUid) {
   if (tailleUid != 4) return false;
   for (int i = 0; i < nbBadgesAutorises; i++) {
@@ -91,71 +83,51 @@ bool estBadgeAutorise(byte *uid, byte tailleUid) {
   return false;
 }
 
-// ---------- Fonction d'écriture (active les 10 premières secondes) ----------
+// ---------- Enregistrement d'un badge dans le tableau (10 premières secondes) ----------
 void writeDataToRFIDTag() {
   if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
     return;
   }
 
-  Serial.println(F("Badge détecté en mode écriture..."));
-  afficherMessage("Mode Ecriture", "Ecriture en cours...");
-
-  byte bloc = 4; // Bloc 4 (Secteur 1) : zone de données utilisateur sans risque
-  byte donneesAEcrire[16] = {"Badge_IoT_2026"}; // 16 octets max par bloc
-
-  // 1. Authentification sur le secteur
-  MFRC522::StatusCode status = rfid.PCD_Authenticate(
-    MFRC522::PICC_CMD_MF_AUTH_KEY_A, bloc, &key, &(rfid.uid)
-  );
-  
-  if (status != MFRC522::STATUS_OK) {
-    Serial.print(F("Erreur d'authentification : "));
-    Serial.println(rfid.GetStatusCodeName(status));
-    afficherMessage("Erreur Ecriture", "Auth echouee");
+  // 1. Vérifier si le badge est déjà enregistré
+  if (estBadgeAutorise(rfid.uid.uidByte, rfid.uid.size)) {
+    Serial.println(F("Ce badge est déjà dans la liste !"));
+    afficherMessage("Deja enregistre", "Badge connu");
+    digitalWrite(LED_VERT_PIN, HIGH);
+  } 
+  // 2. Vérifier s'il reste de la place dans le tableau
+  else if (nbBadgesAutorises >= MAX_BADGES) {
+    Serial.println(F("Tableau plein ! Impossible d'ajouter un badge."));
+    afficherMessage("Erreur Memoire", "Liste pleine !");
     digitalWrite(LED_ROUGE_PIN, HIGH);
-    delay(1500);
-    digitalWrite(LED_ROUGE_PIN, LOW);
-    rfid.PICC_HaltA();
-    rfid.PCD_StopCrypto1();
-    return;
-  }
+  } 
+  // 3. Ajouter l'UID du nouveau badge dans le tableau
+  else {
+    for (byte i = 0; i < 4; i++) {
+      badgesAutorises[nbBadgesAutorises][i] = rfid.uid.uidByte[i];
+    }
+    nbBadgesAutorises++;
 
-  // 2. Écriture des 16 octets dans le bloc 4
-  status = rfid.MIFARE_Write(bloc, donneesAEcrire, 16);
-  if (status != MFRC522::STATUS_OK) {
-    Serial.print(F("Échec de l'écriture : "));
-    Serial.println(rfid.GetStatusCodeName(status));
-    afficherMessage("Erreur Ecriture", "Echec ecriture");
-    digitalWrite(LED_ROUGE_PIN, HIGH);
-  } else {
-    Serial.println(F("Données écrites avec succès dans le bloc 4 !"));
-    afficherMessage("Mode Ecriture", "Succes !");
+    Serial.print(F("Nouveau badge ajouté ! Total enregistrés : "));
+    Serial.println(nbBadgesAutorises);
+    afficherMessage("Nouveau badge", "Ajoute avec succes!");
     digitalWrite(LED_VERT_PIN, HIGH);
   }
 
-  delay(2000);
-  digitalWrite(LED_ROUGE_PIN, LOW);
+  delay(1500);
   digitalWrite(LED_VERT_PIN, LOW);
+  digitalWrite(LED_ROUGE_PIN, LOW);
 
   rfid.PICC_HaltA();
   rfid.PCD_StopCrypto1();
 }
 
-// ---------- Fonction de lecture / contrôle d'accès (après 10 secondes) ----------
+// ---------- Lecture et vérification d'accès (après 10 secondes) ----------
 void readingDataFromRFIDTag() {
   if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
     return;
   }
 
-  // Affichage de l'UID dans le moniteur série pour vous aider à récupérer vos codes
-  Serial.print(F("UID scanné :"));
-  for (byte i = 0; i < rfid.uid.size; i++) {
-    Serial.print(rfid.uid.uidByte[i] < 0x10 ? " 0x0" : " 0x");
-    Serial.print(rfid.uid.uidByte[i], HEX);
-  }
-  Serial.println();
-
-  // Comparaison avec la liste des badges autorisés
   if (estBadgeAutorise(rfid.uid.uidByte, rfid.uid.size)) {
     Serial.println(F("-> Accès autorisé"));
     afficherMessage("Acces autorise", "Bienvenue !");
@@ -170,7 +142,6 @@ void readingDataFromRFIDTag() {
 
   delay(2000);
 
-  // Extinction des LED et retour à l'écran d'attente
   digitalWrite(LED_VERT_PIN, LOW);
   digitalWrite(LED_ROUGE_PIN, LOW);
   afficherMessage("En attente...", "Approchez un tag");
@@ -192,25 +163,25 @@ void setup() {
   setupRFID();
 
   debutProgramme = millis();
-  Serial.println(F("=== Mode écriture actif pendant 10 secondes ==="));
+  Serial.println(F("=== Mode ajout de badges actif pendant 10 secondes ==="));
 }
 
 void loop() {
   unsigned long tempsEcoule = millis() - debutProgramme;
 
-  // Phase 1 : Les 10 premières secondes -> Mode écriture
-  if (tempsEcoule < DUREE_MODE_ECRITURE) {
-    int secondesRestantes = (DUREE_MODE_ECRITURE - tempsEcoule) / 1000 + 1;
+  // Pendant les 10 premières secondes : enregistrement dans le tableau
+  if (tempsEcoule < DUREE_MODE_AJOUT) {
+    int secondesRestantes = (DUREE_MODE_AJOUT - tempsEcoule) / 1000 + 1;
     char buffer[25];
-    snprintf(buffer, sizeof(buffer), "Reste : %d s", secondesRestantes);
-    afficherMessage("Mode Ecriture...", buffer);
+    snprintf(buffer, sizeof(buffer), "Scannez (%d s)", secondesRestantes);
+    afficherMessage("Ajout de badge :", buffer);
     
     writeDataToRFIDTag();
   } 
-  // Phase 2 : Après 10 secondes -> Mode contrôle d'accès
+  // Après 10 secondes : contrôle d'accès normal
   else {
     if (!messageAttenteAffiche) {
-      Serial.println(F("=== Fin du mode écriture. Passage en contrôle d'accès ==="));
+      Serial.println(F("=== Fin du mode ajout. Passage en contrôle d'accès ==="));
       afficherMessage("En attente...", "Approchez un tag");
       messageAttenteAffiche = true;
     }
