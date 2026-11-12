@@ -9,8 +9,8 @@
 #include <ESPAsyncWebServer.h>
 #include <time.h>
 
-const char* ssid = "OnePlus 9 5G";
-const char* password = "w3kvm68b";
+const char* ssid = "...";
+const char* password = "...";
 const char* FIREBASE_HOST = "https://projetiot-rfid-default-rtdb.europe-west1.firebasedatabase.app";
 
 const char* ntpServer = "pool.ntp.org";
@@ -19,6 +19,7 @@ const int daylightOffset_sec = 3600;  // Heure d'été
 
 AsyncWebServer server(80);
 
+// Ecran
 #define SDA_PIN 9
 #define SCL_PIN 10
 #define SCREEN_WIDTH 128
@@ -28,6 +29,8 @@ AsyncWebServer server(80);
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+
+// Capteur RFID
 #define SCK_PIN 2
 #define MISO_PIN 6
 #define MOSI_PIN 7
@@ -36,6 +39,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 MFRC522 rfid(SS_PIN, RST_PIN);
 
+
+// LED
 #define LED_ROUGE 4
 #define LED_VERTE 5
 
@@ -44,6 +49,7 @@ struct Badge {
   String nom;
 };
 
+// Liste badge valide
 #define MAX_BADGES 10
 Badge badges[MAX_BADGES] = {
   {{0xDE, 0xAD, 0xBE, 0xEF}, "Sylvain (Admin)"}
@@ -54,6 +60,8 @@ unsigned long debutAjout = 0;
 const unsigned long DUREE_AJOUT = 10000;
 bool attenteAffichee = false;
 
+
+// Interface WEB
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML>
 <html lang="fr">
